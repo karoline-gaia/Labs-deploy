@@ -1,6 +1,35 @@
 # Weather Service - Sistema de Consulta de Clima por CEP
 
-Sistema em Go que recebe um CEP brasileiro, identifica a cidade e retorna o clima atual em Celsius, Fahrenheit e Kelvin. Desenvolvido para deploy no Google Cloud Run.
+Sistema em Go que recebe um CEP brasileiro, identifica a cidade e retorna o clima atual em Celsius, Fahrenheit e Kelvin.
+
+## 🌐 Serviço em Produção
+
+**URL do serviço deployado no Google Cloud Run:**
+```
+https://weather-service-175512104676.us-central1.run.app
+```
+
+### 🧪 Testes Rápidos
+
+```bash
+# Health Check
+curl https://weather-service-175512104676.us-central1.run.app/
+
+# CEP válido (São Paulo - Av. Paulista)
+curl https://weather-service-175512104676.us-central1.run.app/weather/01310100
+
+# CEP inválido (retorna 422)
+curl https://weather-service-175512104676.us-central1.run.app/weather/123
+
+# CEP não encontrado (retorna 404)
+curl https://weather-service-175512104676.us-central1.run.app/weather/99999999
+```
+
+### 🌍 Testar no Navegador
+
+- **São Paulo:** https://weather-service-175512104676.us-central1.run.app/weather/01310100
+- **Rio de Janeiro:** https://weather-service-175512104676.us-central1.run.app/weather/20040020
+- **Belo Horizonte:** https://weather-service-175512104676.us-central1.run.app/weather/30130100
 
 ## 📋 Requisitos
 
@@ -60,21 +89,27 @@ go test -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
-## 📡 Endpoints
+## 📡 Endpoints da API
 
 ### GET /weather/{cep}
 
 Retorna a temperatura atual para o CEP informado.
 
+**Formato do CEP:** 8 dígitos (com ou sem hífen)
+
 **Exemplo de requisição:**
 
 ```bash
+# Produção
+curl https://weather-service-175512104676.us-central1.run.app/weather/01310100
+
+# Local
 curl http://localhost:8080/weather/01310100
 ```
 
 **Respostas:**
 
-#### Sucesso (200)
+#### ✅ Sucesso (200 OK)
 ```json
 {
   "temp_C": 28.5,
@@ -83,14 +118,18 @@ curl http://localhost:8080/weather/01310100
 }
 ```
 
-#### CEP inválido (422)
+#### ❌ CEP Inválido (422 Unprocessable Entity)
+Quando o CEP não possui 8 dígitos ou contém caracteres inválidos.
+
 ```json
 {
   "message": "invalid zipcode"
 }
 ```
 
-#### CEP não encontrado (404)
+#### ❌ CEP Não Encontrado (404 Not Found)
+Quando o CEP é válido mas não existe na base do ViaCEP.
+
 ```json
 {
   "message": "can not find zipcode"
@@ -102,30 +141,60 @@ curl http://localhost:8080/weather/01310100
 Health check do serviço.
 
 ```bash
+# Produção
+curl https://weather-service-175512104676.us-central1.run.app/
+
+# Local
 curl http://localhost:8080/
 ```
 
-Resposta:
+**Resposta:**
 ```json
 {
   "status": "ok"
 }
 ```
 
-## 🧪 Exemplos de Teste
+## 🧪 Exemplos de Teste Completos
+
+### Testando o Serviço em Produção
 
 ```bash
-# CEP válido (Av. Paulista, São Paulo)
-curl http://localhost:8080/weather/01310100
+# 1. Health Check
+curl https://weather-service-175512104676.us-central1.run.app/
+# Resposta esperada: {"status":"ok"}
 
-# CEP válido com hífen
-curl http://localhost:8080/weather/01310-100
+# 2. CEP válido (Av. Paulista, São Paulo)
+curl https://weather-service-175512104676.us-central1.run.app/weather/01310100
+# Resposta esperada: {"temp_C":XX.X,"temp_F":XX.X,"temp_K":XXX.X}
 
-# CEP inválido (formato incorreto)
-curl http://localhost:8080/weather/123
+# 3. CEP válido com hífen
+curl https://weather-service-175512104676.us-central1.run.app/weather/01310-100
+# Resposta esperada: {"temp_C":XX.X,"temp_F":XX.X,"temp_K":XXX.X}
 
-# CEP não encontrado
-curl http://localhost:8080/weather/99999999
+# 4. CEP inválido (formato incorreto) - Retorna 422
+curl https://weather-service-175512104676.us-central1.run.app/weather/123
+# Resposta esperada: {"message":"invalid zipcode"}
+
+# 5. CEP não encontrado - Retorna 404
+curl https://weather-service-175512104676.us-central1.run.app/weather/99999999
+# Resposta esperada: {"message":"can not find zipcode"}
+```
+
+### Outros CEPs para Teste
+
+```bash
+# Rio de Janeiro - Centro
+curl https://weather-service-175512104676.us-central1.run.app/weather/20040020
+
+# Belo Horizonte - Centro
+curl https://weather-service-175512104676.us-central1.run.app/weather/30130100
+
+# Curitiba - Centro
+curl https://weather-service-175512104676.us-central1.run.app/weather/80010000
+
+# Porto Alegre - Centro
+curl https://weather-service-175512104676.us-central1.run.app/weather/90010000
 ```
 
 ## 🏗️ Estrutura do Projeto
@@ -224,30 +293,47 @@ gcloud run services delete weather-service --region us-central1
 ## 🔧 Tecnologias Utilizadas
 
 - **Go 1.21**: Linguagem de programação
-- **ViaCEP API**: Consulta de CEPs brasileiros
-- **WeatherAPI**: Consulta de dados meteorológicos
-- **Docker**: Containerização
+- **ViaCEP API**: Consulta de CEPs brasileiros (https://viacep.com.br/)
+- **WeatherAPI**: Consulta de dados meteorológicos (https://www.weatherapi.com/)
+- **Docker**: Containerização com multi-stage build
 - **Google Cloud Run**: Hospedagem serverless
+- **testify**: Framework de testes para Go
 
 ## 📝 Conversões de Temperatura
 
-- **Celsius para Fahrenheit**: F = C × 1.8 + 32
-- **Celsius para Kelvin**: K = C + 273
+As conversões são realizadas conforme especificado:
+
+- **Celsius para Fahrenheit**: `F = C × 1.8 + 32`
+- **Celsius para Kelvin**: `K = C + 273`
 
 ## 🧪 Cobertura de Testes
 
 Os testes automatizados (`main_test.go`) cobrem:
 
-- ✅ Validação de formato de CEP (8 dígitos, com/sem hífen)
-- ✅ Conversões de temperatura (Celsius → Fahrenheit, Kelvin)
-- ✅ Respostas HTTP corretas para cada cenário (200, 404, 422)
-- ✅ Tratamento de erros e edge cases
-- ✅ Health check endpoint
+- ✅ **Validação de formato de CEP**: 8 dígitos, com/sem hífen, caracteres inválidos
+- ✅ **Conversões de temperatura**: Precisão das fórmulas C→F e C→K
+- ✅ **Respostas HTTP corretas**: Status codes 200, 404, 422
+- ✅ **Tratamento de erros**: CEP inválido, CEP não encontrado
+- ✅ **Health check endpoint**: Verificação de disponibilidade
 
-**Executar testes:**
+**Executar testes localmente:**
 ```bash
 go test -v -cover
 ```
+
+## 📊 Requisitos Atendidos
+
+- ✅ Sistema recebe CEP válido de 8 dígitos
+- ✅ Realiza pesquisa do CEP via ViaCEP
+- ✅ Consulta temperatura via WeatherAPI
+- ✅ Retorna temperaturas em Celsius, Fahrenheit e Kelvin
+- ✅ Responde com código 200 em caso de sucesso
+- ✅ Responde com código 422 para CEP inválido
+- ✅ Responde com código 404 para CEP não encontrado
+- ✅ Testes automatizados implementados
+- ✅ Docker e docker-compose configurados
+- ✅ Deploy realizado no Google Cloud Run
+- ✅ Endereço ativo e acessível
 
 ## 📄 Licença
 
@@ -255,4 +341,4 @@ Este projeto foi desenvolvido para fins educacionais como parte de um desafio t�
 
 ## 👤 Autor
 
-Desenvolvido em Go com foco em boas práticas, testes automatizados e deploy em cloud.
+Desenvolvido em Go com foco em boas práticas, clean code, testes automatizados e deploy em cloud.
