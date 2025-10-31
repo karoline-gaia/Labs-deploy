@@ -65,9 +65,12 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	// Extrair CEP da URL
 	path := strings.TrimPrefix(r.URL.Path, "/weather/")
 	cep := strings.TrimSpace(path)
+	
+	log.Printf("Received request for CEP: %s", cep)
 
 	// Validar formato do CEP (8 dígitos)
 	if !isValidCEP(cep) {
+		log.Printf("Invalid CEP format: %s", cep)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		json.NewEncoder(w).Encode(ErrorResponse{Message: "invalid zipcode"})
 		return
@@ -77,18 +80,23 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	location, err := getLocationByCEP(cep)
 	if err != nil {
 		if err.Error() == "CEP not found" {
+			log.Printf("CEP not found: %s", cep)
 			w.WriteHeader(http.StatusNotFound)
 			json.NewEncoder(w).Encode(ErrorResponse{Message: "can not find zipcode"})
 		} else {
+			log.Printf("ERROR: Failed to get location for CEP %s: %v", cep, err)
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(ErrorResponse{Message: "internal server error"})
 		}
 		return
 	}
+	
+	log.Printf("Found location for CEP %s: %s", cep, location)
 
 	// Buscar temperatura pela localização
 	tempC, err := getTemperature(location)
 	if err != nil {
+		log.Printf("ERROR: Failed to get temperature for location '%s': %v", location, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(ErrorResponse{Message: "error fetching weather data"})
 		return
@@ -97,6 +105,8 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	// Converter temperaturas
 	tempF := celsiusToFahrenheit(tempC)
 	tempK := celsiusToKelvin(tempC)
+
+	log.Printf("Successfully processed CEP %s: %.1f°C, %.1f°F, %.1f°K", cep, tempC, tempF, tempK)
 
 	// Retornar resposta
 	w.WriteHeader(http.StatusOK)
@@ -148,27 +158,40 @@ func getLocationByCEP(cep string) (string, error) {
 func getTemperature(location string) (float64, error) {
 	apiKey := os.Getenv("WEATHER_API_KEY")
 	if apiKey == "" {
-		// Para testes locais, você pode usar uma chave de API padrão
-		// Em produção, sempre use variáveis de ambiente
-		log.Println("Warning: WEATHER_API_KEY not set")
+		log.Println("ERROR: WEATHER_API_KEY not set")
+		return 0, fmt.Errorf("weather API key not configured")
 	}
 
+	// URL encode da localização para evitar problemas com caracteres especiais
 	url := fmt.Sprintf("http://api.weatherapi.com/v1/current.json?key=%s&q=%s&aqi=no", apiKey, location)
+	log.Printf("Fetching weather for location: %s", location)
+	
 	resp, err := http.Get(url)
 	if err != nil {
-		return 0, err
+		log.Printf("ERROR: Failed to fetch weather data: %v", err)
+		return 0, fmt.Errorf("failed to connect to weather API: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("ERROR: Weather API returned status %d for location: %s", resp.StatusCode, location)
+		
+		// Tentar ler o corpo da resposta para mais detalhes
+		var errorResp map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err == nil {
+			log.Printf("Weather API error details: %+v", errorResp)
+		}
+		
 		return 0, fmt.Errorf("weather API error: status %d", resp.StatusCode)
 	}
 
 	var weatherAPI WeatherAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&weatherAPI); err != nil {
-		return 0, err
+		log.Printf("ERROR: Failed to decode weather API response: %v", err)
+		return 0, fmt.Errorf("failed to parse weather data: %v", err)
 	}
 
+	log.Printf("Successfully fetched temperature for %s: %.1f°C", location, weatherAPI.Current.TempC)
 	return weatherAPI.Current.TempC, nil
 }
 
