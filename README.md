@@ -229,16 +229,22 @@ O método mais fácil é usar o **Google Cloud Shell** (terminal integrado no na
 - Clique no ícone **`>_`** no canto superior direito
 - Aguarde o terminal abrir
 
-#### 3. Fazer Upload dos Arquivos
-- Clique nos **3 pontos `⋮`** → **"Upload"**
-- Selecione todos os arquivos do projeto
-- Aguarde o upload concluir
+#### 3. Clonar o Repositório
+
+```bash
+# Clonar o projeto
+git clone https://github.com/karoline-gaia/Labs-deploy.git
+cd Labs-deploy
+```
 
 #### 4. Executar o Deploy
 
 ```bash
-# Definir sua API Key do WeatherAPI
-export WEATHER_API_KEY="sua_chave_api_aqui"
+# Configurar projeto
+gcloud config set project fullcycle01
+
+# Definir API Key do WeatherAPI
+export WEATHER_API_KEY="e3a7bd5d41e0453391a220046252810"
 
 # Deploy (aguarde 3-5 minutos)
 gcloud run deploy weather-service \
@@ -251,28 +257,44 @@ gcloud run deploy weather-service \
   --max-instances 10
 ```
 
-#### 5. Obter a URL do Serviço
+#### 5. Redeploy (Atualizar o Serviço)
 
-Após o deploy, copie a URL exibida no terminal ou execute:
+Para atualizar o serviço após mudanças no código:
 
 ```bash
-gcloud run services describe weather-service \
-  --region us-central1 \
-  --format 'value(status.url)'
+cd ~/Labs-deploy
+git pull origin main
+./redeploy.sh
 ```
 
-#### 6. Testar o Serviço
+Ou manualmente:
 
 ```bash
-# Substitua pela sua URL
-curl https://weather-service-xxxxx-uc.a.run.app/weather/01310100
+cd ~/Labs-deploy
+git pull origin main
+
+export WEATHER_API_KEY="e3a7bd5d41e0453391a220046252810"
+
+gcloud run deploy weather-service \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-env-vars WEATHER_API_KEY=$WEATHER_API_KEY
 ```
 
 ### Comandos Úteis
 
 ```bash
-# Ver logs em tempo real
+# Ver logs em tempo real (útil para debug)
 gcloud run services logs tail weather-service --region us-central1
+
+# Ver logs das últimas 50 linhas
+gcloud run services logs read weather-service --region us-central1 --limit 50
+
+# Obter URL do serviço
+gcloud run services describe weather-service \
+  --region us-central1 \
+  --format 'value(status.url)'
 
 # Atualizar variável de ambiente
 gcloud run services update weather-service \
@@ -321,6 +343,48 @@ Os testes automatizados (`main_test.go`) cobrem:
 go test -v -cover
 ```
 
+## 🔍 Troubleshooting
+
+### Erro: "error fetching weather data"
+
+Se você receber este erro, verifique:
+
+1. **API Key configurada corretamente:**
+```bash
+# No Cloud Shell, verificar se a variável está definida
+gcloud run services describe weather-service --region us-central1 --format 'value(spec.template.spec.containers[0].env[0].value)'
+```
+
+2. **Ver logs detalhados:**
+```bash
+# Logs em tempo real
+gcloud run services logs tail weather-service --region us-central1
+
+# Últimas 100 linhas
+gcloud run services logs read weather-service --region us-central1 --limit 100
+```
+
+3. **Testar localmente:**
+```bash
+export WEATHER_API_KEY="e3a7bd5d41e0453391a220046252810"
+docker-compose up
+curl http://localhost:8080/weather/01310100
+```
+
+### Melhorias Implementadas
+
+**v1.1 - Logs e Tratamento de Erros Aprimorados:**
+- ✅ Logs detalhados em cada etapa do processamento
+- ✅ Mensagens de erro mais específicas
+- ✅ Validação da API Key no início
+- ✅ Rastreamento completo de requisições
+- ✅ Detalhes de erros da Weather API nos logs
+
+Para ver os logs após fazer uma requisição:
+```bash
+gcloud run services logs read weather-service --region us-central1 --limit 20
+```
+
 ## 📊 Requisitos Atendidos
 
 - ✅ Sistema recebe CEP válido de 8 dígitos
@@ -334,6 +398,8 @@ go test -v -cover
 - ✅ Docker e docker-compose configurados
 - ✅ Deploy realizado no Google Cloud Run
 - ✅ Endereço ativo e acessível
+- ✅ Logs detalhados para debugging
+- ✅ Tratamento robusto de erros
 
 ## 📄 Licença
 
