@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -21,13 +22,13 @@ type ErrorResponse struct {
 }
 
 type ViaCEPResponse struct {
-	Cep         string `json:"cep"`
-	Logradouro  string `json:"logradouro"`
-	Complemento string `json:"complemento"`
-	Bairro      string `json:"bairro"`
-	Localidade  string `json:"localidade"`
-	UF          string `json:"uf"`
-	Erro        bool   `json:"erro"`
+	Cep         string      `json:"cep"`
+	Logradouro  string      `json:"logradouro"`
+	Complemento string      `json:"complemento"`
+	Bairro      string      `json:"bairro"`
+	Localidade  string      `json:"localidade"`
+	UF          string      `json:"uf"`
+	Erro        interface{} `json:"erro,omitempty"`
 }
 
 type WeatherAPIResponse struct {
@@ -147,7 +148,8 @@ func getLocationByCEP(cep string) (string, error) {
 	}
 
 	// ViaCEP retorna um campo "erro": true quando o CEP não existe
-	if viaCEP.Erro {
+	// O campo pode ser bool ou string, então verificamos também se a localidade está vazia
+	if viaCEP.Erro != nil || viaCEP.Localidade == "" {
 		return "", fmt.Errorf("CEP not found")
 	}
 
@@ -163,10 +165,11 @@ func getTemperature(location string) (float64, error) {
 	}
 
 	// URL encode da localização para evitar problemas com caracteres especiais
-	url := fmt.Sprintf("http://api.weatherapi.com/v1/current.json?key=%s&q=%s&aqi=no", apiKey, location)
+	encodedLocation := url.QueryEscape(location)
+	weatherURL := fmt.Sprintf("https://api.weatherapi.com/v1/current.json?key=%s&q=%s&aqi=no", apiKey, encodedLocation)
 	log.Printf("Fetching weather for location: %s", location)
 	
-	resp, err := http.Get(url)
+	resp, err := http.Get(weatherURL)
 	if err != nil {
 		log.Printf("ERROR: Failed to fetch weather data: %v", err)
 		return 0, fmt.Errorf("failed to connect to weather API: %v", err)
@@ -200,5 +203,5 @@ func celsiusToFahrenheit(celsius float64) float64 {
 }
 
 func celsiusToKelvin(celsius float64) float64 {
-	return celsius + 273
+	return celsius + 273.15
 }

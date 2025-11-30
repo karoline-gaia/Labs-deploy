@@ -54,10 +54,10 @@ func TestCelsiusToKelvin(t *testing.T) {
 		celsius  float64
 		expected float64
 	}{
-		{0, 273},
-		{-273, 0},
-		{25, 298},
-		{100, 373},
+		{0, 273.15},
+		{-273.15, 0},
+		{25, 298.15},
+		{100, 373.15},
 	}
 
 	for _, tt := range tests {
@@ -152,7 +152,7 @@ func TestWeatherHandler_ValidCEP_Integration(t *testing.T) {
 	
 	// Verifica se as temperaturas foram calculadas corretamente
 	expectedF := response.TempC*1.8 + 32
-	expectedK := response.TempC + 273
+	expectedK := response.TempC + 273.15
 	
 	assert.Equal(t, expectedF, response.TempF)
 	assert.Equal(t, expectedK, response.TempK)
